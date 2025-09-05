@@ -7,15 +7,16 @@ def main():
     """
     Connects to the Gmail API, fetches the latest n emails, and prints their subject, sender, and a preview of the body.
     """
+    n = 5 
     service = authenticate_gmail()
-    emails = fetch_latest_emails(service, n=1)
+    emails = fetch_latest_emails(service, n=n)
 
     processed = []
 
     for email in emails:
         body = clean_text(email['body'])
         summary = summarize_email(body)
-        print(summary)
+        # print(summary) # Uncomment to see summaries in console
         processed.append({
             "subject": email["subject"],
             "sender": email["sender"],
