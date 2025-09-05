@@ -1,4 +1,6 @@
-from gmail_api import authenticate_gmail, fetch_latest_emails
+from services.gmail_api import authenticate_gmail, fetch_latest_emails
+from services.summary import summarize_email
+from services.utils import clean_text
 
 def main():
     """
@@ -6,11 +8,23 @@ def main():
     """
     service = authenticate_gmail()
     emails = fetch_latest_emails(service, n=5)
-    for idx, email in enumerate(emails, 1):
-        print(f"\n[{idx}]  Subject: {email['subject']}")
+
+    processed = []
+
+    for email in emails:
+        body = clean_text(email['body'])
+        summary = summarize_email(body)
+        processed.append({
+            "subject": email["subject"],
+            "sender": email["sender"],
+            "body": summary
+        })
+    
+    for email in processed:
+        print(f"Subject: {email['subject']}")
         print(f"From: {email['sender']}")
-        body_preview = email['body'][:200].replace("\n", " ")
-        print(f"    Body Preview: {body_preview}...\n")
+        print(f"Preview: {email['body']}")
+        print("-" * 40)
 
 if __name__ == "__main__":
     main()
