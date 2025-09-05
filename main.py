@@ -1,30 +1,31 @@
 from services.gmail_api import authenticate_gmail, fetch_latest_emails
 from services.summary import summarize_email
 from services.utils import clean_text
+from generate_html import save_emails
 
 def main():
     """
-    Connects to the Gmail API, fetches the latest 5 emails, and prints their subject, sender, and a preview of the body.
+    Connects to the Gmail API, fetches the latest n emails, and prints their subject, sender, and a preview of the body.
     """
     service = authenticate_gmail()
-    emails = fetch_latest_emails(service, n=5)
+    emails = fetch_latest_emails(service, n=1)
 
     processed = []
 
     for email in emails:
         body = clean_text(email['body'])
         summary = summarize_email(body)
+        print(summary)
         processed.append({
             "subject": email["subject"],
             "sender": email["sender"],
-            "body": summary
+            "summary": summary,
+            "body": body
         })
-    
-    for email in processed:
-        print(f"Subject: {email['subject']}")
-        print(f"From: {email['sender']}")
-        print(f"Preview: {email['body']}")
-        print("-" * 40)
+
+
+        
+    save_emails(processed, 'output/inbox.html')
 
 if __name__ == "__main__":
     main()

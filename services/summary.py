@@ -1,12 +1,13 @@
+from transformers import pipeline
+
+summarizer_pipeline = pipeline("summarization", model="facebook/bart-large-cnn",framework="pt")
+
 def summarize_email(text):
-    """
-    Dummy summarizer for now.
-    
-    """
     if not text:
         return "No content"
+    try:
+        summary = summarizer_pipeline(text, max_length=80, min_length=20, do_sample=False)
+        return summary[0]['summary_text']
     
-    # Simple heuristic: first 2 sentences
-    sentences = text.split(". ")
-    summary = ". ".join(sentences[:2])
-    return summary.strip() + ("..." if len(sentences) > 2 else "")
+    except Exception as e:
+        return f"[Summarization failed: {e}]"
