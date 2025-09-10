@@ -16,30 +16,39 @@ def init_gmail_service():
 
 def extract_body(payload):
     """
-    Extracts the body content from the email payload.
-    Args:
-        payload (dict): The payload part of the email message. """
-    
-    body = "<Empty Body>"
+    Recursively extracts the plain text body from a Gmail message payload.
+    Ignores HTML content.
+    """
+    def decode_base64(data):
+        return base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8', errors='ignore')
 
     if 'parts' in payload:
         for part in payload['parts']:
-            if part['mimeType'] == 'multipart/alternative':
-                for subpart in part['parts']:
-                    if subpart['mimeType'] == 'text/plain':
-                        body = base64.urlsafe_b64decode(subpart['body']['data']).decode('utf-8', errors='ignore')
-                        return body
+            # Recurse into nested parts
+            if 'parts' in part:
+                result = extract_body(part)
+                if result:
+                    return result
             
-            elif part['mimeType'] == 'text/plain':
-                body = base64.urlsafe_b64decode(part['body']['data']).decode('utf-8', errors='ignore')
-                return body
-            
-    elif body in payload and 'data' in payload['body']:
-        body = base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8', errors='ignore')
-        return body
+            # For debugging purposes
+            if part.get('mimeType') == 'text/html':
+                print("Skipped HTML part")
+
+
+            # Return the plain text part
+            if part.get('mimeType') == 'text/plain' and 'data' in part.get('body', {}):
+                return decode_base64(part['body']['data'])
+
+    # Handle top-level body if no parts exist
+    if payload.get('mimeType') == 'text/plain' and 'data' in payload.get('body', {}):
+        return decode_base64(payload['body']['data'])
+
+    return "<Empty Body>"
+
+
 
 def get_email_details(service, user_id = 'me', label_ids = None, 
-                      folder_name='Inbox', max_results= 5):
+                      folder_name='Inbox', max_results=10):
     """
     Fetches the email details using the Gmail API service and message ID.
     Args:
@@ -92,31 +101,41 @@ def get_email_content(service, msg_id):
     subject = next((header['value'] for header in headers if header['name'] == 'Subject'), "<No Subject>")
     sender = next((header['value'] for header in headers if header['name'] == 'From'), "<Unknown Sender>")
     recipients = next((header['value'] for header in headers if header['name'] =='To'), "<Unknown Recipient>")
+    body = extract_body(payload)
     snippet = message.get('snippet', "<No Snippet>")
     has_attachments = any(part.get('filename') for part in payload.get('parts', []))
     date = next((header['value'] for header in headers if header['name'] =='Date'), "<Unknown Date>")
     star = message.get('labelIds') and 'STARRED' in message.get('labelIds')
     label = ', '.join(message.get('labelIds', []))
-    body = extract_body(payload)
+    
 
     return {
         'subject': subject,
         'from': sender,
         'recipients': recipients,
+        'body': body,
         'snippet': snippet,
         'has_attachments': has_attachments,
         'date': date,
         'starred': star,
-        'labels': label,
-        'body': body
+        'labels': label
     }
 
 service = init_gmail_service()
 
 email_data = get_email_details(service, folder_name='Inbox', max_results=10)
 
-for i in range(len(email_data)):
-    for key,val in email_data[i].items():
-        print(f"{key}: {val}")
-        print()
-    print("-" * 40)
+for email in email_data:
+    details = get_email_content(service, email['id'])
+    if details:
+        print(f"Subject: {details['subject']}")
+        print(f"From: {details['from']}")
+        print(f"To: {details['recipients']}")
+        print(f"Body: {details['body']}")  
+        # print(f"Body: {details['body'][:100]}")  
+        print(f"Date: {details['date']}")
+        print(f"Starred: {details['starred']}")
+        print(f"Labels: {details['labels']}")
+        print(f"Snippet: {details['snippet']}")
+        print(f"Has Attachments: {details['has_attachments']}")
+        print("-" * 50)
