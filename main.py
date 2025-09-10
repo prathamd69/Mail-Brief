@@ -7,7 +7,7 @@ def main():
     """
     Connects to the Gmail API, fetches the latest n emails, and prints their subject, sender, and a preview of the body.
     """
-    n = 5 
+    n = 10
     service = authenticate_gmail()
     emails = fetch_latest_emails(service, n=n)
 
