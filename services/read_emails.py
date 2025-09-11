@@ -32,7 +32,8 @@ def extract_body(payload):
             
             # For debugging purposes
             if part.get('mimeType') == 'text/html':
-                print("Skipped HTML part")
+                # print("Skipped HTML part")
+                pass
 
 
             # Return the plain text part
@@ -50,10 +51,18 @@ def extract_body(payload):
 def get_email_details(service, user_id = 'me', label_ids = None, 
                       folder_name='Inbox', max_results=10):
     """
-    Fetches the email details using the Gmail API service and message ID.
+    Fetches a list of email message metadata from a specified Gmail folder.
+
     Args:
         service (googleapiclient.discovery.Resource): Authenticated Gmail API service object.
-        msg_id (str): The ID of the email message to fetch. """
+        user_id (str): Gmail user ID, usually 'me'.
+        label_ids (list): List of label IDs to filter messages.
+        folder_name (str): Name of the Gmail folder to fetch messages from.
+        max_results (int): Maximum number of messages to fetch.
+
+    Returns:
+        list: List of message metadata dictionaries.
+    """
    
     messages = []
     next_page_token = None
@@ -89,10 +98,16 @@ def get_email_details(service, user_id = 'me', label_ids = None,
     
 def get_email_content(service, msg_id):
     """
-    Fetches the email content using the Gmail API service and message ID.
+    Fetches and parses the content of a Gmail message by its ID.
+
     Args:
         service (googleapiclient.discovery.Resource): Authenticated Gmail API service object.
-        msg_id (str): The ID of the email message to fetch."""
+        msg_id (str): The ID of the email message to fetch.
+
+    Returns:
+        dict: Dictionary containing subject, sender, recipients, body, snippet, attachments, date, starred status, and labels.
+        None: If the email is promotional, spam, trash, or social.
+    """
         
     message = service.users().messages().get(userId='me', id=msg_id, format='full').execute()
     payload = message['payload']
@@ -106,7 +121,14 @@ def get_email_content(service, msg_id):
     has_attachments = any(part.get('filename') for part in payload.get('parts', []))
     date = next((header['value'] for header in headers if header['name'] =='Date'), "<Unknown Date>")
     star = message.get('labelIds') and 'STARRED' in message.get('labelIds')
-    label = ', '.join(message.get('labelIds', []))
+    labels = message.get('labelIds', [])
+
+    # Skip promotional, spam, trash, and social emails
+    if 'CATEGORY_PROMOTIONS' in labels or 'SPAM' in labels or 'TRASH' in labels or 'CATEGORY_SOCIAL' in labels:
+        # print('*' * 50)
+        # print("Skipping email")
+        # print('*' * 50)
+        return None
     
 
     return {
@@ -118,12 +140,13 @@ def get_email_content(service, msg_id):
         'has_attachments': has_attachments,
         'date': date,
         'starred': star,
-        'labels': label
+        'labels': labels
     }
 
 service = init_gmail_service()
 
-email_data = get_email_details(service, folder_name='Inbox', max_results=10)
+email_data = get_email_details(service, folder_name='Inbox', max_results=3)
+
 
 for email in email_data:
     details = get_email_content(service, email['id'])
@@ -131,8 +154,8 @@ for email in email_data:
         print(f"Subject: {details['subject']}")
         print(f"From: {details['from']}")
         print(f"To: {details['recipients']}")
-        print(f"Body: {details['body']}")  
-        # print(f"Body: {details['body'][:100]}")  
+        print(f"Body: {details['body'][:100]}")  
+        # print(f"Body: {details['body']}")  
         print(f"Date: {details['date']}")
         print(f"Starred: {details['starred']}")
         print(f"Labels: {details['labels']}")
