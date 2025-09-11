@@ -1,4 +1,6 @@
 import base64
+import os
+import mimetypes
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -143,14 +145,57 @@ def get_email_content(service, msg_id):
         'labels': labels
     }
 
-service = init_gmail_service()
+def get_attachment(service, user_id, msg_id, tar_dir):
+    """
+    Downloads all attachments from a Gmail message and saves them to the specified directory.
+    If an attachment does not have a file extension, attempts to guess and append the correct extension.
 
-email_data = get_email_details(service, folder_name='Inbox', max_results=3)
+    Args:
+        service (googleapiclient.discovery.Resource): Authenticated Gmail API service object.
+        user_id (str): Gmail user ID, usually 'me'.
+        msg_id (str): The ID of the email message containing the attachment.
+        tar_dir (str): Target directory path where attachments will be saved.
+
+    Process:
+        - Retrieves the email message using the Gmail API.
+        - Iterates through each part of the message payload.
+        - Checks for attachments by looking for a filename and attachmentId.
+        - Downloads each attachment, decodes its data, and writes it to disk.
+        - If the file lacks an extension, guesses the extension based on MIME type and renames the file.
+    """
+    message = service.users().messages().get(userId='me', id=msg_id).execute()
+    body = message['payload']
+    parts = body.get('parts', [])
+    
+    for part in parts:
+        if part.get('filename') and part['body'].get('attachmentId'):
+            attach_id = part['body']['attachmentId']
+            print(f'Fetching attachment with ID: {attach_id}')
+            attachment = service.users().messages().attachments().get(
+                userId=user_id, messageId=msg_id, id=attach_id
+            ).execute()
+            data = attachment['data']
+            file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
+            file_path = os.path.join(tar_dir, part['filename'])
+            print(f'Saving attachment to {file_path}')
+            with open(file_path, 'wb') as f:
+                f.write(file_data)
+            
+            ext = os.path.splitext(part['filename'])[1]
+            if not ext:
+                ext = mimetypes.guess_extension(part.get('mimeType', 'application/octet-stream') or '.bin')
+                new_file_path = file_path + ext
+                os.rename(file_path, new_file_path)
+                print(f'Renamed file to {new_file_path}')
+
+service = init_gmail_service()
+email_data = get_email_details(service, folder_name='Inbox', max_results=30)
 
 
 for email in email_data:
     details = get_email_content(service, email['id'])
     if details:
+        print("-" * 50)
         print(f"Subject: {details['subject']}")
         print(f"From: {details['from']}")
         print(f"To: {details['recipients']}")
@@ -162,3 +207,5 @@ for email in email_data:
         print(f"Snippet: {details['snippet']}")
         print(f"Has Attachments: {details['has_attachments']}")
         print("-" * 50)
+        if details['has_attachments']:
+            get_attachment(service, user_id='me', msg_id=email['id'], tar_dir='C:/Users/prath/OneDrive/Documents/GitHub/Mail-Brief/')
