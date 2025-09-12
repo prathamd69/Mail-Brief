@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Email Summary</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #e0eafc, #cfdef3);
+      margin: 0;
+      padding: 50px 20px;
+      color: #2c3e50;
+      max-width: 960px;
+      margin-left: auto;
+      margin-right: auto;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    h1 {
+      font-weight: 700;
+      font-size: 3rem;
+      color: #34495e;
+      text-align: center;
+      margin-bottom: 50px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    .email {
+      background: #ffffffdd;
+      border-radius: 18px;
+      padding: 28px 32px;
+      margin-bottom: 30px;
+      box-shadow:
+        0 10px 15px rgba(0, 0, 0, 0.05),
+        0 4px 6px rgba(0, 0, 0, 0.07);
+      transition: box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .email:hover,
+    .email:focus {
+      box-shadow:
+        0 15px 30px rgba(0, 0, 0, 0.15),
+        0 10px 15px rgba(0, 0, 0, 0.1);
+      transform: translateY(-6px);
+      outline: none;
+    }
+    .subject {
+      font-weight: 700;
+      font-size: 1.6rem;
+      color: #2980b9;
+      margin-bottom: 10px;
+      word-break: break-word;
+    }
+    .from,
+    .date {
+      font-size: 0.95rem;
+      color: #7f8c8d;
+      margin-bottom: 8px;
+      font-style: italic;
+      letter-spacing: 0.03em;
+    }
+    .snippet {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      color: #34495e;
+      margin-top: 15px;
+      letter-spacing: 0.02em;
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none; /* hidden by default */
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-content {
+      background: white;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border-radius: 12px;
+      padding: 30px 40px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+      position: relative;
+      font-size: 1.1rem;
+      color: #34495e;
+      line-height: 1.6;
+      letter-spacing: 0.02em;
+      animation: slideIn 0.3s ease forwards;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(40px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-close-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      font-size: 20px;
+      cursor: pointer;
+      font-weight: 700;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s ease;
+    }
+    .modal-close-btn:hover {
+      background: #c0392b;
+    }
+    .modal-subject {
+      font-weight: 700;
+      font-size: 1.8rem;
+      margin-bottom: 12px;
+      color: #2980b9;
+    }
+    .modal-meta {
+      font-style: italic;
+      color: #7f8c8d;
+      margin-bottom: 25px;
+    }
+
+    /* Responsive */
+    @media (max-width: 620px) {
+      h1 {
+        font-size: 2.4rem;
+        margin-bottom: 40px;
+      }
+      .email {
+        padding: 22px 24px;
+      }
+      .subject {
+        font-size: 1.3rem;
+      }
+      .snippet {
+        font-size: 1rem;
+      }
+      .modal-content {
+        padding: 24px 28px;
+      }
+      .modal-subject {
+        font-size: 1.4rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Email Summaries</h1>
+
+  {% for email in data %}
+  <div class="email" tabindex="0" role="button" aria-pressed="false" aria-label="Open full email from {{ email.from }} with subject {{ email.subject }}" data-subject="{{ email.subject }}" data-from="{{ email.from }}" data-date="{{ email.date }}" data-body="{{ email.body | e }}">
+    <div class="subject">{{ email.subject }}</div>
+    <div class="from">From: {{ email.from }}</div>
+    <div class="date">Date: {{ email.date }}</div>
+    <div class="snippet">{{ email.snippet }}</div>
+  </div>
+  {% endfor %}
+
+  <!-- Modal -->
+  <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-subject" tabindex="-1">
+    <div class="modal-content">
+      <button class="modal-close-btn" aria-label="Close modal">&times;</button>
+      <div class="modal-subject" id="modal-subject"></div>
+      <div class="modal-meta"></div>
+      <div class="modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    const emails = document.querySelectorAll('.email');
+    const modalOverlay = document.querySelector('.modal-overlay');
+    const modalSubject = modalOverlay.querySelector('.modal-subject');
+    const modalMeta = modalOverlay.querySelector('.modal-meta');
+    const modalBody = modalOverlay.querySelector('.modal-body');
+    const closeBtn = modalOverlay.querySelector('.modal-close-btn');
+
+    // Open modal and fill with data
+    function openModal(emailDiv) {
+      modalSubject.textContent = emailDiv.getAttribute('data-subject');
+      modalMeta.textContent = `From: ${emailDiv.getAttribute('data-from')} | Date: ${emailDiv.getAttribute('data-date')}`;
+      modalBody.textContent = emailDiv.getAttribute('data-body');
+      modalOverlay.classList.add('active');
+      modalOverlay.focus();
+    }
+
+    // Close modal
+    function closeModal() {
+      modalOverlay.classList.remove('active');
+    }
+
+    // Event listeners
+    emails.forEach(email => {
+      email.addEventListener('click', () => openModal(email));
+      email.addEventListener('keydown', (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openModal(email);
+        }
+      });
+    });
+
+    closeBtn.addEventListener('click', closeModal);
+
+    // Close modal if clicking outside modal content
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) {
+        closeModal();
+      }
+    });
+
+    // Close modal on Escape key
+    window.addEventListener('keydown', (e) => {
+      if (e.key === "Escape" && modalOverlay.classList.contains('active')) {
+        closeModal();
+      }
+    });
+  </script>
+</body>
+</html>
