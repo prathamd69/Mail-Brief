@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-from gmail_api import create_service
+from services.gmail_api import create_service
 
 def init_gmail_service():
     """
@@ -187,25 +187,3 @@ def get_attachment(service, user_id, msg_id, tar_dir):
                 new_file_path = file_path + ext
                 os.rename(file_path, new_file_path)
                 print(f'Renamed file to {new_file_path}')
-
-service = init_gmail_service()
-email_data = get_email_details(service, folder_name='Inbox', max_results=30)
-
-
-for email in email_data:
-    details = get_email_content(service, email['id'])
-    if details:
-        print("-" * 50)
-        print(f"Subject: {details['subject']}")
-        print(f"From: {details['from']}")
-        print(f"To: {details['recipients']}")
-        print(f"Body: {details['body'][:100]}")  
-        # print(f"Body: {details['body']}")  
-        print(f"Date: {details['date']}")
-        print(f"Starred: {details['starred']}")
-        print(f"Labels: {details['labels']}")
-        print(f"Snippet: {details['snippet']}")
-        print(f"Has Attachments: {details['has_attachments']}")
-        print("-" * 50)
-        if details['has_attachments']:
-            get_attachment(service, user_id='me', msg_id=email['id'], tar_dir='C:/Users/prath/OneDrive/Documents/GitHub/Mail-Brief/')
