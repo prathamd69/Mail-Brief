@@ -200,7 +200,9 @@
     function openModal(emailDiv) {
       modalSubject.textContent = emailDiv.getAttribute('data-subject');
       modalMeta.textContent = `From: ${emailDiv.getAttribute('data-from')} | Date: ${emailDiv.getAttribute('data-date')}`;
-      modalBody.textContent = emailDiv.getAttribute('data-body');
+      const rawBody = emailDiv.getAttribute('data-body');
+      const htmlBody = rawBody.replace(/\n/g, '<br>');
+      modalBody.innerHTML = htmlBody;
       modalOverlay.classList.add('active');
       modalOverlay.focus();
     }

@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from services.gmail_api import create_service
+from utilities.cleaning import clean_email_body
 
 def init_gmail_service():
     """
@@ -118,8 +119,8 @@ def get_email_content(service, msg_id):
     subject = next((header['value'] for header in headers if header['name'] == 'Subject'), "<No Subject>")
     sender = next((header['value'] for header in headers if header['name'] == 'From'), "<Unknown Sender>")
     recipients = next((header['value'] for header in headers if header['name'] =='To'), "<Unknown Recipient>")
-    body = extract_body(payload)
-    snippet = message.get('snippet', "<No Snippet>")
+    body = clean_email_body(extract_body(payload))
+    snippet = clean_email_body(message.get('snippet', "<No Snippet>"))
     has_attachments = any(part.get('filename') for part in payload.get('parts', []))
     date = next((header['value'] for header in headers if header['name'] =='Date'), "<Unknown Date>")
     star = message.get('labelIds') and 'STARRED' in message.get('labelIds')
@@ -127,9 +128,6 @@ def get_email_content(service, msg_id):
 
     # Skip promotional, spam, trash, and social emails
     if 'CATEGORY_PROMOTIONS' in labels or 'SPAM' in labels or 'TRASH' in labels or 'CATEGORY_SOCIAL' in labels:
-        # print('*' * 50)
-        # print("Skipping email")
-        # print('*' * 50)
         return None
     
 
