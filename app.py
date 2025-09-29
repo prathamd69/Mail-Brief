@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request
 import json
 from main import main 
+import os
 
 app = Flask(__name__)
 
@@ -20,6 +21,9 @@ def index():
 
         with open('emails.json', encoding='utf-8') as f:
             emails = json.load(f)
+
+        # if os.path.exists('emails.json'):
+        #     os.remove('emails.json')
 
         return render_template('emails.html', data=emails)
 

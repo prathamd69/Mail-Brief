@@ -10,6 +10,7 @@ def main(max_emails=10):
     creds = gmail_service._http.credentials
 
     email_data = get_email_details(gmail_service, folder_name='Inbox', max_results=max_emails)
+    print(f"Got {len(email_data)} email IDs from get_email_details")
     all_emails = []
 
     for email in email_data:
@@ -25,4 +26,3 @@ def main(max_emails=10):
     print(f"✅ Saved {len(all_emails)} emails to {OUTPUT_FILE}")
     print("✅ Completed")
 
-main()
