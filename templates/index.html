@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <title>Fetch Emails</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Generator</title>
 </head>
 <body>
-    <h1>Enter number of emails to fetch</h1>
+    <h1>Generate Emails</h1>
     <form method="POST">
-        <input type="number" name="count" min="1" max="100" value="10" required />
-        <button type="submit">Fetch Emails</button>
+        <label for="value">How many emails to generate?</label>
+        <input type="number" id="value" name="value" min="1" required>
+        <input type="submit" value="Generate">
     </form>
 </body>
 </html>

@@ -1,7 +1,5 @@
 from services.read_emails import init_gmail_service, get_email_details, get_email_content
-from utilities.upload import upload_to_drive
 from googleapiclient.discovery import build
-from config import DRIVE_FOLDER_ID
 import json
 
 
@@ -10,8 +8,6 @@ def main(max_emails=10):
  
     gmail_service = init_gmail_service()
     creds = gmail_service._http.credentials
-
-    drive_service = build('drive', 'v3', credentials=creds)
 
     email_data = get_email_details(gmail_service, folder_name='Inbox', max_results=max_emails)
     all_emails = []
@@ -27,5 +23,6 @@ def main(max_emails=10):
         json.dump(all_emails, f, indent=2, ensure_ascii=False)
 
     print(f"✅ Saved {len(all_emails)} emails to {OUTPUT_FILE}")
+    print("✅ Completed")
 
-    upload_to_drive(drive_service, OUTPUT_FILE, folder_id=DRIVE_FOLDER_ID)
+main()
