@@ -1,0 +1,187 @@
+import base64
+import os
+import mimetypes
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+from services.gmail_api import create_service
+from utilities.cleaning import clean_email_body
+
+def init_gmail_service():
+    """
+    Initializes and returns the Gmail API service object.
+    Returns:
+        googleapiclient.discovery.Resource: Authenticated Gmail API service object.
+    """
+    service = create_service()
+    return service
+
+def extract_body(payload):
+    """
+    Recursively extracts the plain text body from a Gmail message payload.
+    Ignores HTML content.
+    """
+    def decode_base64(data):
+        return base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8', errors='ignore')
+
+    if 'parts' in payload:
+        for part in payload['parts']:
+            # Recurse into nested parts
+            if 'parts' in part:
+                result = extract_body(part)
+                if result:
+                    return result
+            
+            # For debugging purposes
+            if part.get('mimeType') == 'text/html':
+                # print("Skipped HTML part")
+                pass
+
+
+            # Return the plain text part
+            if part.get('mimeType') == 'text/plain' and 'data' in part.get('body', {}):
+                return decode_base64(part['body']['data'])
+
+    # Handle top-level body if no parts exist
+    if payload.get('mimeType') == 'text/plain' and 'data' in payload.get('body', {}):
+        return decode_base64(payload['body']['data'])
+
+    return "<Empty Body>"
+
+
+
+def get_email_details(service, user_id = 'me', label_ids = None, 
+                      folder_name='Inbox', max_results=10):
+    """
+    Fetches a list of email message metadata from a specified Gmail folder.
+
+    Args:
+        service (googleapiclient.discovery.Resource): Authenticated Gmail API service object.
+        user_id (str): Gmail user ID, usually 'me'.
+        label_ids (list): List of label IDs to filter messages.
+        folder_name (str): Name of the Gmail folder to fetch messages from.
+        max_results (int): Maximum number of messages to fetch.
+
+    Returns:
+        list: List of message metadata dictionaries.
+    """
+   
+    messages = []
+    next_page_token = None
+
+    if folder_name:
+        label_results = service.users().labels().list(userId=user_id).execute()
+        labels = label_results.get('labels', [])
+        folder_label_id = next((label['id'] for label in labels if label['name'].lower() == folder_name.lower()), None)
+
+        if folder_label_id:
+            if label_ids:
+                label_ids.append(folder_label_id)
+            else:
+                label_ids = [folder_label_id]
+    
+        else:
+            raise ValueError(f"Folder '{folder_name}' not found.")
+        
+    while True:
+        results = service.users().messages().list(
+            userId=user_id, labelIds=label_ids,
+            pageToken=next_page_token, 
+            maxResults=max_results).execute()
+        
+        msgs = results.get('messages', [])
+        messages.extend(msgs)
+        next_page_token = results.get('nextPageToken')
+
+        if not next_page_token or len(messages) >= max_results:
+            break
+
+    return messages[:max_results] if max_results else messages
+    
+def get_email_content(service, msg_id):
+    """
+    Fetches and parses the content of a Gmail message by its ID.
+
+    Args:
+        service (googleapiclient.discovery.Resource): Authenticated Gmail API service object.
+        msg_id (str): The ID of the email message to fetch.
+
+    Returns:
+        dict: Dictionary containing subject, sender, recipients, body, snippet, attachments, date, starred status, and labels.
+        None: If the email is promotional, spam, trash, or social.
+    """
+        
+    message = service.users().messages().get(userId='me', id=msg_id, format='full').execute()
+    payload = message['payload']
+    headers = payload.get('headers', [])
+
+    subject = next((header['value'] for header in headers if header['name'] == 'Subject'), "<No Subject>")
+    sender = next((header['value'] for header in headers if header['name'] == 'From'), "<Unknown Sender>")
+    recipients = next((header['value'] for header in headers if header['name'] =='To'), "<Unknown Recipient>")
+    body = clean_email_body(extract_body(payload))
+    snippet = clean_email_body(message.get('snippet', "<No Snippet>"))
+    has_attachments = any(part.get('filename') for part in payload.get('parts', []))
+    date = next((header['value'] for header in headers if header['name'] =='Date'), "<Unknown Date>")
+    star = message.get('labelIds') and 'STARRED' in message.get('labelIds')
+    labels = message.get('labelIds', [])
+
+    # Skip promotional, spam, trash, and social emails
+    if 'CATEGORY_PROMOTIONS' in labels or 'SPAM' in labels or 'TRASH' in labels or 'CATEGORY_SOCIAL' in labels:
+        return None
+    
+
+    return {
+        'subject': subject,
+        'from': sender,
+        'recipients': recipients,
+        'body': body,
+        'snippet': snippet,
+        'has_attachments': has_attachments,
+        'date': date,
+        'starred': star,
+        'labels': labels
+    }
+
+def get_attachment(service, user_id, msg_id, tar_dir):
+    """
+    Downloads all attachments from a Gmail message and saves them to the specified directory.
+    If an attachment does not have a file extension, attempts to guess and append the correct extension.
+
+    Args:
+        service (googleapiclient.discovery.Resource): Authenticated Gmail API service object.
+        user_id (str): Gmail user ID, usually 'me'.
+        msg_id (str): The ID of the email message containing the attachment.
+        tar_dir (str): Target directory path where attachments will be saved.
+
+    Process:
+        - Retrieves the email message using the Gmail API.
+        - Iterates through each part of the message payload.
+        - Checks for attachments by looking for a filename and attachmentId.
+        - Downloads each attachment, decodes its data, and writes it to disk.
+        - If the file lacks an extension, guesses the extension based on MIME type and renames the file.
+    """
+    message = service.users().messages().get(userId='me', id=msg_id).execute()
+    body = message['payload']
+    parts = body.get('parts', [])
+    
+    for part in parts:
+        if part.get('filename') and part['body'].get('attachmentId'):
+            attach_id = part['body']['attachmentId']
+            print(f'Fetching attachment with ID: {attach_id}')
+            attachment = service.users().messages().attachments().get(
+                userId=user_id, messageId=msg_id, id=attach_id
+            ).execute()
+            data = attachment['data']
+            file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
+            file_path = os.path.join(tar_dir, part['filename'])
+            print(f'Saving attachment to {file_path}')
+            with open(file_path, 'wb') as f:
+                f.write(file_data)
+            
+            ext = os.path.splitext(part['filename'])[1]
+            if not ext:
+                ext = mimetypes.guess_extension(part.get('mimeType', 'application/octet-stream') or '.bin')
+                new_file_path = file_path + ext
+                os.rename(file_path, new_file_path)
+                print(f'Renamed file to {new_file_path}')
